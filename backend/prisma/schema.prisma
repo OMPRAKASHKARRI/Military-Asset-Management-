@@ -1,0 +1,152 @@
+// Prisma schema for the Military Asset Management System
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  BASE_COMMANDER
+  LOGISTICS_OFFICER
+}
+
+enum EquipmentCategory {
+  WEAPON
+  VEHICLE
+  AMMUNITION
+}
+
+enum TransferStatus {
+  PENDING
+  COMPLETED
+  REJECTED
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  passwordHash String
+  role         Role
+  baseId       Int?
+  base         Base?    @relation(fields: [baseId], references: [id])
+  createdAt    DateTime @default(now())
+
+  purchases    Purchase[]    @relation("PurchaseCreatedBy")
+  transfers    Transfer[]    @relation("TransferInitiatedBy")
+  assignments  Assignment[]  @relation("AssignmentAssignedBy")
+  expenditures Expenditure[] @relation("ExpenditureRecordedBy")
+  auditLogs    AuditLog[]
+
+  @@index([baseId])
+}
+
+model Base {
+  id       Int    @id @default(autoincrement())
+  name     String @unique
+  location String
+
+  users               User[]
+  purchases           Purchase[]
+  assignments         Assignment[]
+  expenditures        Expenditure[]
+  transfersOut        Transfer[]   @relation("TransferSource")
+  transfersIn         Transfer[]   @relation("TransferDestination")
+}
+
+model EquipmentType {
+  id       Int               @id @default(autoincrement())
+  name     String            @unique
+  category EquipmentCategory
+
+  purchases    Purchase[]
+  transfers    Transfer[]
+  assignments  Assignment[]
+  expenditures Expenditure[]
+}
+
+model Purchase {
+  id              Int           @id @default(autoincrement())
+  baseId          Int
+  base            Base          @relation(fields: [baseId], references: [id])
+  equipmentTypeId Int
+  equipmentType   EquipmentType @relation(fields: [equipmentTypeId], references: [id])
+  quantity        Int
+  date            DateTime
+  createdById     Int
+  createdBy       User          @relation("PurchaseCreatedBy", fields: [createdById], references: [id])
+  createdAt       DateTime      @default(now())
+
+  @@index([baseId])
+  @@index([equipmentTypeId])
+  @@index([date])
+}
+
+model Transfer {
+  id                  Int            @id @default(autoincrement())
+  sourceBaseId        Int
+  sourceBase          Base           @relation("TransferSource", fields: [sourceBaseId], references: [id])
+  destinationBaseId   Int
+  destinationBase     Base           @relation("TransferDestination", fields: [destinationBaseId], references: [id])
+  equipmentTypeId     Int
+  equipmentType       EquipmentType  @relation(fields: [equipmentTypeId], references: [id])
+  quantity            Int
+  status              TransferStatus @default(COMPLETED)
+  initiatedById       Int
+  initiatedBy         User           @relation("TransferInitiatedBy", fields: [initiatedById], references: [id])
+  timestamp           DateTime       @default(now())
+
+  @@index([sourceBaseId])
+  @@index([destinationBaseId])
+  @@index([equipmentTypeId])
+  @@index([timestamp])
+}
+
+model Assignment {
+  id              Int           @id @default(autoincrement())
+  baseId          Int
+  base            Base          @relation(fields: [baseId], references: [id])
+  equipmentTypeId Int
+  equipmentType   EquipmentType @relation(fields: [equipmentTypeId], references: [id])
+  personnelName   String
+  quantity        Int
+  assignedById    Int
+  assignedBy      User          @relation("AssignmentAssignedBy", fields: [assignedById], references: [id])
+  assignedAt      DateTime      @default(now())
+
+  @@index([baseId])
+  @@index([equipmentTypeId])
+}
+
+model Expenditure {
+  id              Int           @id @default(autoincrement())
+  baseId          Int
+  base            Base          @relation(fields: [baseId], references: [id])
+  equipmentTypeId Int
+  equipmentType   EquipmentType @relation(fields: [equipmentTypeId], references: [id])
+  quantity        Int
+  reason          String
+  recordedById    Int
+  recordedBy      User          @relation("ExpenditureRecordedBy", fields: [recordedById], references: [id])
+  recordedAt      DateTime      @default(now())
+
+  @@index([baseId])
+  @@index([equipmentTypeId])
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  action    String
+  details   String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
